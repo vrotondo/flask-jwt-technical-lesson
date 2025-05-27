@@ -6,6 +6,12 @@ function LoginForm({ onLogin }) {
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const onLogin = (token, user) => {
+    localStorage.setItem("token", token);
+    setUser(user)
+  }
+
+  if (!user) return <Login onLogin={onLogin} />;
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -19,7 +25,7 @@ function LoginForm({ onLogin }) {
     }).then((r) => {
       setIsLoading(false);
       if (r.ok) {
-        r.json().then((user) => onLogin(user));
+        r.json().then(({ token, user }) => onLogin({ token, user }));
       } else {
         r.json().then((err) => setErrors(err.errors));
       }

@@ -4,8 +4,10 @@ from flask import request, session, jsonify, make_response
 from flask_restful import Resource
 from sqlalchemy.exc import IntegrityError
 
-from config import app, db, api
+from config import app, db, api, jwt
 from models import User, Recipe, UserSchema, RecipeSchema
+
+from flask_jwt_extended import create_access_token, get_jwt_identity, verify_jwt_in_request
 
 @app.before_request
 def check_if_logged_in():
@@ -14,8 +16,8 @@ def check_if_logged_in():
         'login'
     ]
 
-    if (request.endpoint) not in open_access_list and (not session.get('user_id')):
-        return {'errors': ['401 Unauthorized']}, 401
+    if (request.endpoint) not in open_access_list and (not verify_jwt_in_request()):
+        return {'error': '401 Unauthorized'}, 401
 
 class Signup(Resource):
     def post(self):
@@ -44,31 +46,40 @@ class Signup(Resource):
 
 class CheckSession(Resource):
     def get(self):
-
-        user = User.query.filter(User.id == session['user_id']).first()
+        user_id = get_jwt_identity()
+            
+        user = User.query.filter(User.id == user_id).first()
         
         return UserSchema().dump(user), 200
-
 
 class Login(Resource):
     def post(self):
 
-        username = request.get_json()['username']
-        password = request.get_json()['password']
+        username = request.json['username']
+        password = request.json['password']
 
         user = User.query.filter(User.username == username).first()
 
         if user and user.authenticate(password):
-            session['user_id'] = user.id
-            return UserSchema().dump(user), 200
+            token = create_access_token(identity=user.id)
+            return make_response(jsonify(token=access_token, user=UserSchema().dump(user)), 200)
 
         return {'errors': ['401 Unauthorized']}, 401
+
 
 class Logout(Resource):
     def delete(self):
 
         session['user_id'] = None
         return {}, 204
+    
+class WhoAmI(Resource):
+    def get(self):
+        user_id = get_jwt_identity()
+            
+        user = User.query.filter(User.id == user_id).first()
+        
+        return UserSchema().dump(user), 200
 
 class RecipeIndex(Resource):
     def get(self):
@@ -83,7 +94,8 @@ class RecipeIndex(Resource):
             title=request_json.get('title'),
             instructions=request_json.get('instructions'),
             minutes_to_complete=request_json.get('minutes_to_complete'),
-            user_id=session['user_id']
+            # user_id=session['user_id']
+            user_id=get_jwt_identity()
         )
 
         try:
@@ -99,7 +111,7 @@ api.add_resource(CheckSession, '/check_session', endpoint='check_session')
 api.add_resource(Login, '/login', endpoint='login')
 api.add_resource(Logout, '/logout', endpoint='logout')
 api.add_resource(RecipeIndex, '/recipes', endpoint='recipes')
-
+api.add_resource(WhoAmI, '/me', endpoint='me')
 
 if __name__ == '__main__':
     app.run(port=5555, debug=True)

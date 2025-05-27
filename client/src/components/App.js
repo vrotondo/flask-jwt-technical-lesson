@@ -9,8 +9,12 @@ function App() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // auto-login
-    fetch("/check_session").then((r) => {
+    // change from /check_session to me and add header 
+    fetch("/me", {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`
+      }
+    }).then((r) => {
       if (r.ok) {
         r.json().then((user) => setUser(user));
       }
